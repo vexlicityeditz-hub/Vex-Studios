@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Rag-Doll-Arena – Vex-Studios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      overflow: hidden;
+      touch-action: none;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #fff;
+    }
+    #gameCanvas {
+      display: block;
+      background: #05060a;
+    }
+
+    /* GENERIC OVERLAYS */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+    }
+
+    /* LOADING SCREEN */
+    #loadingOverlay {
+      background: radial-gradient(circle at center, #0f172a 0, #020617 55%, #000 100%);
+      flex-direction: column;
+      gap: 16px;
+    }
+    .loading-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: #38bdf8;
+      text-shadow: 0 0 18px #0ea5e9;
+      letter-spacing: 2px;
+    }
+    .loading-sub {
+      font-size: 13px;
+      color: #e5e7eb;
+      opacity: 0.8;
+    }
+    .loading-bar {
+      width: 180px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.9);
+      overflow: hidden;
+      border: 1px solid rgba(148,163,184,0.7);
+      box-shadow: 0 0 16px rgba(15,23,42,0.9);
+    }
+    .loading-fill {
+      width: 40%;
+      height: 100%;
+      background: linear-gradient(90deg, #22d3ee, #0ea5e9, #22d3ee);
+      animation: loadingPulse 1.2s infinite ease-in-out;
+    }
+    @keyframes loadingPulse {
+      0% { transform: translateX(-60%); }
+      50% { transform: translateX(40%); }
+      100% { transform: translateX(120%); }
+    }
+    .loading-hint {
+      font-size: 11px;
+      color: #9ca3af;
+      opacity: 0.9;
+    }
+
+    /* MENU PANEL */
+    #menuOverlay {
+      background: rgba(0,0,0,0.85);
+    }
+    .menu-panel {
+      background: rgba(10, 15, 25, 0.95);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+      border-radius: 14px;
+      padding: 20px 24px;
+      width: min(320px, 90vw);
+      text-align: center;
+    }
+    .menu-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: #1d9fff;
+      text-shadow: 0 0 12px #1d9fff;
+      margin-bottom: 4px;
+      letter-spacing: 1px;
+    }
+    .menu-sub {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .menu-small {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 14px;
+    }
+    .menu-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .btn {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.8);
+      background: linear-gradient(135deg, #020617, #0b1120);
+      color: #e5e7eb;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.08s ease;
+    }
+    .btn-primary {
+      border-color: rgba(56, 189, 248, 0.9);
+      background: linear-gradient(135deg, #0369a1, #0ea5e9);
+      color: #f9fafb;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.7);
+      font-weight: 700;
+    }
+    .btn:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: 0 0 6px rgba(15, 23, 42, 0.8);
+    }
+    .credits-text {
+      font-size: 12px;
+      margin-top: 8px;
+      color: #cbd5f5;
+      display: none;
+    }
+
+    /* BIG PLAY SCREEN (inside menu) */
+    .big-play {
+      margin-top: 10px;
+      padding: 12px 12px;
+      font-size: 18px;
+      letter-spacing: 1px;
+    }
+
+    /* HINT BAR */
+    .hint-bar {
+      position: fixed;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: #9ca3af;
+      text-shadow: 0 0 4px #000;
+      pointer-events: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- AUDIO (YOU ADD THE FILE URL) -->
+  <audio id="bgMusic" loop>
+    <!-- Example: <source src="chill-track.mp3" type="audio/mpeg" /> -->
+  </audio>
+
+  <!-- LOADING SCREEN -->
+  <div class="overlay" id="loadingOverlay">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div class="loading-title">Rag-Doll-Arena</div>
+      <div class="loading-sub">Vex-Studios</div>
+      <div class="loading-bar">
+        <div class="loading-fill"></div>
+      </div>
+      <div class="loading-hint">Booting lab systems… please wait.</div>
+    </div>
+  </div>
+
+  <!-- MENU / PLAY / CREDITS -->
+  <div class="overlay" id="menuOverlay" style="display:none;">
+    <div class="menu-panel">
+      <div class="menu-title">Rag-Doll-Arena</div>
+      <div class="menu-sub">Vex-Studios</div>
+      <div class="menu-small">its just a game U_U</div>
+
+      <div class="menu-buttons">
+        <div class="btn btn-primary big-play" id="btnPlay">PLAY</div>
+        <div class="btn" id="btnCredits">Credits</div>
+      </div>
+
+      <div class="credits-text" id="creditsText">
+        Designed by Vex-Studios<br/>
+        Lab sandbox with ragdolls, tables, and beakers.<br/>
+        Drag limbs and objects with your finger.
+      </div>
+    </div>
+  </div>
+
+  <!-- HINT BAR -->
+  <div class="hint-bar" id="hintBar">
+    Drag limbs, tables, and beakers with your finger. Pinch-zoom is disabled for better control.
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+
+    window.addEventListener('resize', () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+      if (gameState === 'sandbox') setupLab();
+    });
+
+    // UI ELEMENTS
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const menuOverlay = document.getElementById('menuOverlay');
+    const btnPlay = document.getElementById('btnPlay');
+    const btnCredits = document.getElementById('btnCredits');
+    const creditsText = document.getElementById('creditsText');
+    const hintBar = document.getElementById('hintBar');
+    const bgMusic = document.getElementById('bgMusic');
+
+    let gameState = 'loading'; // 'loading' | 'menu' | 'sandbox'
+    let musicStarted = false;
+
+    // LOADING → MENU TRANSITION
+    setTimeout(() => {
+      if (gameState === 'loading') {
+        loadingOverlay.style.display = 'none';
+        menuOverlay.style.display = 'flex';
+        gameState = 'menu';
+      }
+    }, 2000); // 2s fake loading
+
+    // MENU BUTTONS
+    btnPlay.onclick = () => {
+      menuOverlay.style.display = 'none';
+      gameState = 'sandbox';
+      hintBar.style.display = 'block';
+      setupLab();
+      if (!musicStarted) {
+        musicStarted = true;
+        // bgMusic.play().catch(() => {}); // uncomment after adding a real audio source
+      }
+    };
+
+    btnCredits.onclick = () => {
+      creditsText.style.display =
+        creditsText.style.display === 'none' ? 'block' : 'none';
+    };
+
+    // ---------- PHYSICS SETTINGS ----------
+    const GRAVITY = 0.0015;
+    const FLOOR_Y = () => height - 40;
+
+    // ---------- RAGDOLL ----------
+    function createRagdoll(x, y, scale = 1, color = '#ffffff') {
+      const s = scale;
+      const points = {
+        torso: { x, y, vx: 0, vy: 0, r: 7 * s },
+        head: { x, y: y - 20 * s, vx: 0, vy: 0, r: 6 * s },
+        leftHand: { x: x - 14 * s, y: y - 4 * s, vx: 0, vy: 0, r: 4 * s },
+        rightHand: { x: x + 14 * s, y: y - 4 * s, vx: 0, vy: 0, r: 4 * s },
+        leftFoot: { x: x - 8 * s, y: y + 20 * s, vx: 0, vy: 0, r: 4 * s },
+        rightFoot: { x: x + 8 * s, y: y + 20 * s, vx: 0, vy: 0, r: 4 * s }
+      };
+
+      const bones = [
+        ['head', 'torso', 20 * s],
+        ['torso', 'leftHand', 16 * s],
+        ['torso', 'rightHand', 16 * s],
+        ['torso', 'leftFoot', 22 * s],
+        ['torso', 'rightFoot', 22 * s]
+      ];
+
+      return {
+        points,
+        bones,
+        color
+      };
+    }
+
+    function applyRagdollPhysics(ragdoll, dt) {
+      const pts = ragdoll.points;
+      for (const key in pts) {
+        const p = pts[key];
+        p.vy += GRAVITY * dt;
+        p.x += p.vx * (dt / 16);
+        p.y += p.vy * (dt / 16);
+
+        if (p.y + p.r > FLOOR_Y()) {
+          p.y = FLOOR_Y() - p.r;
+          p.vy *= -0.25;
+          p.vx *= 0.8;
+        }
+      }
+
+      for (let i = 0; i < 3; i++) {
+        ragdoll.bones.forEach(([aKey, bKey, dist]) => {
+          const a = pts[aKey];
+          const b = pts[bKey];
+          let dx = b.x - a.x;
+          let dy = b.y - a.y;
+          let d = Math.hypot(dx, dy) || 0.0001;
+          const diff = (d - dist) / d;
+          const adjust = 0.5;
+          dx *= diff * adjust;
+          dy *= diff * adjust;
+          a.x += dx;
+          a.y += dy;
+          b.x -= dx;
+          b.y -= dy;
+        });
+      }
+    }
+
+    function drawRagdoll(ragdoll) {
+      const pts = ragdoll.points;
+      ctx.strokeStyle = ragdoll.color;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+
+      const torso = pts.torso;
+      const glow = ctx.createRadialGradient(torso.x, torso.y, 0, torso.x, torso.y, 50);
+      glow.addColorStop(0, ragdoll.color);
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(torso.x, torso.y, 50, 0, Math.PI * 2);
+      ctx.fill();
+
+      ragdoll.bones.forEach(([aKey, bKey]) => {
+        const a = pts[aKey];
+        const b = pts[bKey];
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      });
+
+      for (const key in pts) {
+        const p = pts[key];
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
+    }
+
+    // ---------- OBJECTS (TABLES + BEAKERS) ----------
+    const objects = [];
+
+    function createTable(x, y, w, h) {
+      objects.push({
+        type: 'table',
+        x, y, w, h,
+        vx: 0, vy: 0,
+        draggable: true,
+        static: false
+      });
+    }
+
+    function createBeaker(x, y, r) {
+      objects.push({
+        type: 'beaker',
+        x, y, r,
+        vx: 0, vy: 0,
+        draggable: true,
+        static: false
+      });
+    }
+
+    function applyObjectPhysics(obj, dt) {
+      if (obj.static) return;
+
+      if (obj.type === 'table') {
+        obj.vy += GRAVITY * 0.3 * dt;
+        obj.x += obj.vx * (dt / 16);
+        obj.y += obj.vy * (dt / 16);
+
+        if (obj.y + obj.h > FLOOR_Y()) {
+          obj.y = FLOOR_Y() - obj.h;
+          obj.vy *= -0.2;
+          obj.vx *= 0.8;
+        }
+      } else if (obj.type === 'beaker') {
+        obj.vy += GRAVITY * dt;
+        obj.x += obj.vx * (dt / 16);
+        obj.y += obj.vy * (dt / 16);
+
+        if (obj.y + obj.r > FLOOR_Y()) {
+          obj.y = FLOOR_Y() - obj.r;
+          obj.vy *= -0.3;
+          obj.vx *= 0.8;
+        }
+      }
+    }
+
+    function drawObject(obj) {
+      if (obj.type === 'table') {
+        ctx.fillStyle = '#2b2f3a';
+        ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = '#3f4656';
+        ctx.fillRect(obj.x, obj.y, obj.w, 6);
+      } else if (obj.type === 'beaker') {
+        const g = ctx.createRadialGradient(obj.x, obj.y, 0, obj.x, obj.y, obj.r * 2);
+        g.addColorStop(0, '#00e5ff');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(obj.x, obj.y, obj.r * 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#aaf7ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // ---------- LAB BACKGROUND ----------
+    function drawLabBackground() {
+      const g = ctx.createLinearGradient(0, 0, 0, height);
+      g.addColorStop(0, '#0b1018');
+      g.addColorStop(0.4, '#111827');
+      g.addColorStop(1, '#05060a');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = '#1f2937';
+      ctx.fillRect(0, FLOOR_Y(), width, height - FLOOR_Y());
+
+      ctx.strokeStyle = 'rgba(80,100,140,0.4)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < width; x += 80) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, FLOOR_Y());
+        ctx.stroke();
+      }
+      for (let y = 40; y < FLOOR_Y(); y += 60) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 4; i++) {
+        const px = (i + 0.5) * (width / 4);
+        const py = 60;
+        const pw = 80;
+        const ph = 20;
+        const grad = ctx.createLinearGradient(px - pw / 2, py, px + pw / 2, py + ph);
+        grad.addColorStop(0, 'rgba(0,229,255,0.2)');
+        grad.addColorStop(1, 'rgba(0,229,255,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(px - pw / 2, py, pw, ph);
+      }
+    }
+
+    // ---------- WORLD SETUP ----------
+    const ragdolls = [];
+
+    function setupLab() {
+      ragdolls.length = 0;
+      objects.length = 0;
+
+      ragdolls.push(createRagdoll(width * 0.35, FLOOR_Y() - 60, 1, '#ffffff'));
+      ragdolls.push(createRagdoll(width * 0.65, FLOOR_Y() - 60, 1, '#ff66ff'));
+
+      createTable(width * 0.2 - 80, FLOOR_Y() - 80, 160, 20);
+      createTable(width * 0.8 - 80, FLOOR_Y() - 120, 160, 20);
+
+      createBeaker(width * 0.2, FLOOR_Y() - 100, 10);
+      createBeaker(width * 0.8, FLOOR_Y() - 140, 10);
+      createBeaker(width * 0.5, FLOOR_Y() - 60, 12);
+    }
+
+    // ---------- INTERACTION ----------
+    let pointerDown = false;
+    let dragTarget = null;
+    let lastPointerPos = { x: 0, y: 0 };
+    let lastPointerTime = 0;
+
+    function getEventPos(e) {
+      if (e.touches && e.touches[0]) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else if (e.changedTouches && e.changedTouches[0]) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      } else {
+        return { x: e.clientX, y: e.clientY };
+      }
+    }
+
+    function onPointerDown(e) {
+      if (gameState !== 'sandbox') return;
+      e.preventDefault();
+      const pos = getEventPos(e);
+      pointerDown = true;
+      lastPointerPos = pos;
+      lastPointerTime = performance.now();
+
+      let best = null;
+      let bestDist = 999999;
+
+      ragdolls.forEach(r => {
+        for (const key in r.points) {
+          const p = r.points[key];
+          const dx = pos.x - p.x;
+          const dy = pos.y - p.y;
+          const d = Math.hypot(dx, dy);
+          if (d < p.r * 2.5 && d < bestDist) {
+            bestDist = d;
+            best = { type: 'ragdoll', ragdoll: r, pointKey: key };
+          }
+        }
+      });
+
+      if (!best) {
+        objects.forEach(o => {
+          if (!o.draggable) return;
+          if (o.type === 'table') {
+            if (pos.x >= o.x && pos.x <= o.x + o.w &&
+                pos.y >= o.y && pos.y <= o.y + o.h) {
+              best = { type: 'object', object: o };
+            }
+          } else if (o.type === 'beaker') {
+            const dx = pos.x - o.x;
+            const dy = pos.y - o.y;
+            const d = Math.hypot(dx, dy);
+            if (d < o.r * 2) {
+              best = { type: 'object', object: o };
+            }
+          }
+        });
+      }
+
+      dragTarget = best;
+    }
+
+    function onPointerMove(e) {
+      if (!pointerDown || !dragTarget || gameState !== 'sandbox') return;
+      e.preventDefault();
+      const pos = getEventPos(e);
+      const now = performance.now();
+      const dt = now - lastPointerTime || 16;
+
+      const vx = (pos.x - lastPointerPos.x) / (dt / 16);
+      const vy = (pos.y - lastPointerPos.y) / (dt / 16);
+
+      if (dragTarget.type === 'ragdoll') {
+        const p = dragTarget.ragdoll.points[dragTarget.pointKey];
+        p.x = pos.x;
+        p.y = pos.y;
+        p.vx = vx * 0.4;
+        p.vy = vy * 0.4;
+      } else if (dragTarget.type === 'object') {
+        const o = dragTarget.object;
+        o.x += (pos.x - lastPointerPos.x);
+        o.y += (pos.y - lastPointerPos.y);
+        o.vx = vx * 0.4;
+        o.vy = vy * 0.4;
+      }
+
+      lastPointerPos = pos;
+      lastPointerTime = now;
+    }
+
+    function onPointerUp(e) {
+      if (gameState !== 'sandbox') return;
+      e.preventDefault();
+      pointerDown = false;
+      dragTarget = null;
+    }
+
+    canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+    canvas.addEventListener('touchmove', onPointerMove, { passive: false });
+    canvas.addEventListener('touchend', onPointerUp, { passive: false });
+    canvas.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+
+    // ---------- COLLISIONS ----------
+    function handleRagdollTableCollisions(ragdoll) {
+      const pts = ragdoll.points;
+      objects.forEach(o => {
+        if (o.type !== 'table') return;
+        const top = o.y;
+        const left = o.x;
+        const right = o.x + o.w;
+
+        for (const key in pts) {
+          const p = pts[key];
+          if (p.x > left && p.x < right && p.y + p.r > top && p.y < top) {
+            p.y = top - p.r;
+            p.vy = Math.min(p.vy, 0) * -0.2;
+            p.vx *= 0.8;
+          }
+        }
+      });
+    }
+
+    // ---------- MAIN LOOP ----------
+    let lastTime = performance.now();
+
+    function update(dt) {
+      if (gameState !== 'sandbox') return;
+
+      ragdolls.forEach(r => {
+        applyRagdollPhysics(r, dt);
+        handleRagdollTableCollisions(r);
+      });
+
+      objects.forEach(o => {
+        applyObjectPhysics(o, dt);
+      });
+    }
+
+    function draw() {
+      drawLabBackground();
+      objects.forEach(drawObject);
+      ragdolls.forEach(drawRagdoll);
+    }
+
+    function loop(timestamp) {
+      const dt = timestamp - lastTime;
+      lastTime = timestamp;
+      update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
